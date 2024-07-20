@@ -11,12 +11,12 @@
       "sourceMap": true,
       "outDir": "dist",
       "baseUrl": ".",
-      
   },
   "include": [
       "src/**/*",
       "testing/**/*",
       "index.ts",
-      "jest.setup.ts"
+      "jest.setup.ts",
+      "jest.config.ts"
     ]
 }

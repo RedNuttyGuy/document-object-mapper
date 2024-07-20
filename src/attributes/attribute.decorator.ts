@@ -1,6 +1,6 @@
-import { Model } from 'src/model/model.class';
+import type { Model } from 'src/model/model.class';
 import type { ModelAttributeOptions } from './model-attribute-options.interface';
-import type { ModelAttribute } from './model-attribute.interface';
+import { ModelAttribute } from './model-attribute.class';
 
 export const attributesMetadataKey = Symbol('model.attributes');
 
@@ -19,13 +19,13 @@ export function Attribute(options?: ModelAttributeOptions) {
       Reflect.getMetadata(attributesMetadataKey, target.constructor) ??
       new Map();
 
-    const attribute: ModelAttribute = {
-      name: propertyKey,
+    const attribute: ModelAttribute = new ModelAttribute(propertyKey, {
       type:
         options?.type ??
         typeof Reflect.getMetadata('design:type', target, propertyKey)(),
-      optional: options?.optional ?? false,
-    };
+      optional: options?.optional,
+      fillable: options?.fillable ?? true,
+    });
 
     attributes.set(propertyKey, attribute);
 

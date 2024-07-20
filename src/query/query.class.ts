@@ -1,16 +1,14 @@
-import type { Model } from '../model/model.class';
 import { QueryOperator } from './query-operator.type';
 import type { QueryFilter } from './query-filter.type';
-import type { ThisConstructor } from '../types/this-constructor.type';
-import type { This } from '../types/this.type';
+import type { CompiledQuery } from './compiled-query.interface';
+import type { Model } from '../model/model.class';
+import { This } from '../types/this.type';
 
 export class Query<T extends Model, TModel extends typeof Model> {
-  protected _model: ThisConstructor<TModel>;
+  protected _model: TModel;
 
-  public static for<T extends Model, TModel extends typeof Model>(
-    model: TModel,
-  ): Query<T, TModel> {
-    return new Query<T, TModel>().for(model);
+  public static for<T extends typeof Model>(model: T): Query<This<T>, T> {
+    return new Query<This<T>, T>().for(model);
   }
 
   private for(model: TModel): this {
@@ -21,25 +19,21 @@ export class Query<T extends Model, TModel extends typeof Model> {
 
   private filters: QueryFilter<T>[] = [];
 
-  public where<TField extends Exclude<keyof T, keyof Model>>(
-    field: TField,
-    value: T[TField],
-  ): this;
-  public where<TField extends Exclude<keyof T, keyof Model>>(
+  public where<TField extends keyof T>(field: TField, value: T[TField]): this;
+  public where<TField extends keyof T>(
     field: TField,
     operator: QueryOperator | `${QueryOperator}`,
-    value: typeof operator extends 'in' ? T[TField][] : T[TField],
+    value: T[TField],
   ): this;
-  public where<TField extends Exclude<keyof T, keyof Model>>(
+  public where<TField extends keyof T>(
     field: TField,
-    operator: QueryOperator | T[TField],
-    value?: typeof operator extends 'in' ? T[TField][] : T[TField],
+    operator: QueryOperator | `${QueryOperator}` | T[TField],
+    value?: T[TField],
   ): this {
     const _field: TField = field;
-    const _operator: QueryOperator | `${QueryOperator}` =
-      value === undefined ? '=' : (operator as QueryOperator);
-    const _value: T[TField] | T[TField][] =
-      value === undefined ? (operator as T[TField]) : value;
+    const _operator: QueryOperator =
+      value === undefined ? QueryOperator.eq : (operator as QueryOperator);
+    const _value: T[TField] = value ?? (operator as T[TField]);
 
     this.filters.push({
       field: _field,
@@ -50,25 +44,29 @@ export class Query<T extends Model, TModel extends typeof Model> {
     return this;
   }
 
-  public async find(): Promise<T[]> {
-    return this._model.findAll<TModel>(
-      this.filters as QueryFilter<This<TModel>>[],
-    ) as Promise<T[]>;
+  public async find(
+    this: Query<This<TModel>, TModel>,
+  ): Promise<This<TModel>[]> {
+    return this._model.find<TModel>(this);
   }
 
-  public async first(): Promise<T> {
-    return this._model.findFirst<TModel>(
-      this.filters as QueryFilter<This<TModel>>[],
-    ) as Promise<T>;
+  public async first(
+    this: Query<This<TModel>, TModel>,
+  ): Promise<This<TModel>[]> {
+    return this._model.first<TModel>(this);
   }
 
   public clone(): Query<T, TModel> {
     const copy = new Query<T, TModel>().for(this._model);
 
     for (const { field, operator, value } of this.filters) {
-      copy.where(field, operator, value as any);
+      copy.where(field, operator, value);
     }
 
     return copy;
+  }
+
+  public build(): CompiledQuery<T> {
+    return { filter: this.filters };
   }
 }

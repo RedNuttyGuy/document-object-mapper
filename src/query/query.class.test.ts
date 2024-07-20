@@ -4,11 +4,11 @@ import { DataTestModel } from '../../testing/data-test-model.model';
 import { QueryOperator } from './query-operator.type';
 import { Model } from '../model/model.class';
 
-const staticFindAllMock = jest
-  .spyOn(Model, 'findAll')
+const staticFindMock = jest
+  .spyOn(Model, 'find')
   .mockImplementation(() => Promise.resolve([]));
-const staticFindFirstMock = jest
-  .spyOn(Model, 'findFirst')
+const staticFirstMock = jest
+  .spyOn(Model, 'first')
   .mockImplementation(() => Promise.resolve(undefined));
 
 describe('Query Builder', () => {
@@ -77,20 +77,22 @@ describe('Query Builder', () => {
 
     await query.find();
 
-    expect(staticFindAllMock).toHaveBeenCalledWith([
-      { field: 'str', operator: '=', value: 'John Doe' },
-    ]);
+    expect(staticFindMock).toHaveBeenCalledWith({
+      _model: DataTestModel,
+      filters: [{ field: 'str', operator: '=', value: 'John Doe' }],
+    });
   });
 
-  it('Calls the model findFirst method to find the first matching record', async () => {
+  it('Calls the model "first" method to find the first matching record', async () => {
     const query = createTestQuery();
     query.where('str', 'John Doe');
 
     await query.first();
 
-    expect(staticFindFirstMock).toHaveBeenCalledWith([
-      { field: 'str', operator: '=', value: 'John Doe' },
-    ]);
+    expect(staticFirstMock).toHaveBeenCalledWith({
+      _model: DataTestModel,
+      filters: [{ field: 'str', operator: '=', value: 'John Doe' }],
+    });
   });
 
   it('clones filter array', () => {

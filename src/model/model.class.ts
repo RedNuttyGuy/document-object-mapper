@@ -5,28 +5,21 @@ import fsLiteDriver from 'unstorage/drivers/fs-lite';
 
 import type { ModelConfig } from './model-config.interface';
 
-import type { ModelAttribute } from '../attributes/model-attribute.interface';
-import {
-  Attribute,
-  attributesMetadataKey,
-} from '../attributes/attribute.decorator';
-
-import type { ModelIndex } from '../indexes/model-index.interface';
-import { Index, indexesMetadataKey } from '../indexes/index.decorator';
+import { ModelAttribute } from '../attributes/model-attribute.class';
+import { Attribute } from '../attributes/attribute.decorator';
 
 import { Query } from '../query/query.class';
-// import type { Queryable } from '../query/queryable.interface';
 import type { QueryFilter } from '../query/query-filter.type';
+import { compare } from '../query/compare.function';
 
 import type { This } from '../types/this.type';
 import type { ThisConstructor } from '../types/this-constructor.type';
-import { QueryOperator } from 'src/query/query-operator.type';
+import type { OmitBaseModel } from '../types/extended-model.type';
 
 export class Model {
   // #region Default fields
 
-  @Attribute()
-  // @Index({ name: '_id' })
+  @Attribute({ fillable: false })
   public id: string;
 
   // #endregion
@@ -37,7 +30,7 @@ export class Model {
 
   public static create<T extends ThisConstructor<typeof Model>>(
     this: T,
-    data: Omit<This<T>, keyof Model>,
+    data: OmitBaseModel<T>,
   ): This<T> {
     const instance: Model = new this();
 
@@ -50,7 +43,9 @@ export class Model {
       set(target, p, newValue, receiver) {
         if (
           typeof p !== 'symbol' &&
-          (target.constructor as typeof Model)._getAttributes().includes(p)
+          ModelAttribute.getFields(target.constructor as typeof Model).find(
+            (attr) => attr.name === p,
+          ) !== null
         ) {
           target._dirty.add(p);
         }
@@ -77,6 +72,10 @@ export class Model {
   private static _config: ModelConfig = {
     storageDriver: fsLiteDriver({ base: 'db' }),
     preventFillingWithExtraAttributes: true,
+    serialization: {
+      serialize: (data) => JSON.stringify(data, null, 2),
+      deserialize: (data) => JSON.parse(data),
+    },
   };
 
   private static _configured = false;
@@ -84,13 +83,13 @@ export class Model {
     this: T,
     config: Partial<ModelConfig>,
   ): void {
-    if (this._configured === true) {
+    if (this._configured) {
       throw new Error(
-        `Failed configuring Model class ${this.name}. You may only configure a Model class once`,
+        `Failed configuring Model class. You may only configure the Model class once`,
       );
     }
 
-    this._config = Object.assign({}, this._config, config);
+    this._config = { ...this._config, ...config };
 
     if (config.storageDriver !== undefined) {
       this._storage = createStorage({
@@ -105,76 +104,24 @@ export class Model {
     driver: this._config.storageDriver,
   });
 
-  protected static getStorageKey(): string;
-  protected static getStorageKey(id: string): string;
-  protected static getStorageKey(id?: string): string {
-    const key = this.name;
-
-    return (id === undefined) 
-      ? key
-      : `${key}:${id}`;
-  }
-
-  protected static getIndexKey(): string;
-  protected static getIndexKey(index: ModelIndex): string;
-  protected static getIndexKey(index?: ModelIndex): string {
-    const key = `${this.name}:_indexes`;
-
-    return (index === undefined)
-      ? key
-      : `${key}:${index.name}`;
-  }
-
-  // #endregion
-
-  // #region Metadata
-
-  private get _name(): string {
-    return this.constructor.name;
-  }
-
-  private static _getAttributeMetadata(): Map<string, ModelAttribute> {
-    const a = Reflect.getMetadata(attributesMetadataKey, this);
-
-    return a as Map<string, ModelAttribute>;
-  }
-
-  private static _getAttributes(): string[] {
-    return Array.from(this._getAttributeMetadata().keys());
-  }
-
-  private static _getFillableAttributes(): string[] {
-    return Array.from(this._getAttributeMetadata().entries())
-      .filter(([name, attr]) => name !== 'id')
-      .map(([attr]) => attr);
-  }
-
-  private static _getRequiredAttributes(): string[] {
-    return Array.from(this._getAttributeMetadata().entries())
-      .filter(([name, attr]) => name !== 'id')
-      .filter(([name, attr]) => !attr.optional)
-      .map(([attr]) => attr);
-  }
-
-  private static _getIndexMetadata(): Map<string, ModelIndex> {
-    return Reflect.getMetadata(indexesMetadataKey, this) as Map<
-      string,
-      ModelIndex
-    >;
-  }
-
-  private static _getIndexes(): ModelIndex[] {
-    return Array.from(this._getIndexMetadata().values());
-  }
-
   // #endregion
 
   // #region Persistance
 
-  private static async readEntityFromStorage<T>(id: string): Promise<T | null> {
-    const data = await this._storage.getItem(this.getStorageKey(id));
+  public static getStorageKey(): string;
+  public static getStorageKey(id: string): string;
+  public static getStorageKey(id?: string): string {
+    const key = this.name;
 
-    return data === null || typeof data !== 'object' ? null : (data as T);
+    return id === undefined ? key : `${key}:${id}`;
+  }
+
+  private static async readEntityFromStorage<
+    T extends ThisConstructor<typeof Model>,
+  >(this: ThisConstructor<T>, id: string): Promise<Record<string, any> | null> {
+    const data = await this._storage.getItemRaw(this.getStorageKey(id));
+
+    return data === null ? null : this.deserialize<T>(data);
   }
 
   private static async writeEntityToStorage<T extends Model>(
@@ -184,175 +131,13 @@ export class Model {
       entity.id = this.generateId();
     }
 
-    await this._storage.setItem(
+    await this._storage.setItemRaw(
       this.getStorageKey(entity.id),
-      entity.toObject(),
+      this.serialize(entity.toObject()),
     );
 
     return entity.id;
   }
-
-  // #endregion
-
-  // #region Indexes
-
-  private static async readIndexFromStorage(
-    index: ModelIndex,
-  ): Promise<Record<any, string[]>> {
-    const data = await this._storage.getItem(this.getIndexKey(index));
-
-    return data === null || typeof data !== 'object'
-      ? null
-      : (data as Record<any, string[]>);
-  }
-
-  private static writeIndexToStorage(
-    index: ModelIndex,
-    indexData: Record<any, string[]>,
-  ) {
-    const indexKey = this.getIndexKey(index);
-    let indexData = await this.readIndexFromStorage(index);
-
-    if (indexData === null) {
-      // indexData = buildIndex(index);
-    }
-
-    // set(indexData, field, value, id)
-
-    await this._storage.setItem(indexKey, indexData);
-  }
-
-  private static async getIdsFromIndexes<T extends Model>(
-    filters: QueryFilter<T>[],
-  ): Promise<string[]> {
-
-    let possibleIds: string[] | null = null;
-
-    let i = 0;
-    do {
-      const filter = filters[i];
-      // get index
-      const index = this._getIndexMetadata().get(filter.field as string)
-      //get index data
-      const indexData = await this.readIndexFromStorage(index)
-      // get ids for filter from indexData
-      const ids = indexData[filter.value];
-
-      possibleIds = (i === 0 && possibleIds === null) 
-        ? ids
-        : possibleIds.filter(id => ids.includes(id));
-    
-    } while(i++ < filters.length || possibleIds !== null || possibleIds.length > 2)
-
-
-
-
-
-
-    const filtersByField = filters
-      .reduce<Record<string, QueryFilter<T>[]>>((a, c) => {
-        const field = c.field as string;
-
-        a[field] === undefined ? (a[field] = [c]) : a[field].push(c)
-      
-        return a;
-      }, {});
-
-    const indexes = this._getIndexes()
-      .filter(index => filtersByField.hasOwnProperty(index.field));
-
-    const possibleMatches = new Set<string>();
-    let i = 0;
-
-    do {
-      const index = indexes[i];
-      const indexData = await this.readIndexFromStorage(index);
-  
-      for (const filter of filtersByField[index.field]) {
-        const ids = {
-          [QueryOperator.eq]:  (value: QueryFilter<T>['value']) => indexData[value],
-          [QueryOperator.gt]:  (value: QueryFilter<T>['value']) => Object.entries(indexData).reduce(
-            (a, [val, ids]) => { if(value > val) {a.push(...ids) } return a}, []),
-          [QueryOperator.gte]: (value: QueryFilter<T>['value']) => Object.entries(indexData).reduce(
-            (a, [val, ids]) => { if(value >= val) {a.push(...ids) } return a}, []),
-          [QueryOperator.in]:  (value: QueryFilter<T>['value'][]) => Object.entries(indexData).reduce(
-            (a, [val, ids]) => { if(val in value) {a.push(...ids) } return a}, []),
-          [QueryOperator.lt]:  (value: QueryFilter<T>['value']) => Object.entries(indexData).reduce(
-            (a, [val, ids]) => { if(value < val) {a.push(...ids) } return a}, []),
-          [QueryOperator.lte]: (value: QueryFilter<T>['value']) => Object.entries(indexData).reduce(
-            (a, [val, ids]) => { if(value <= val) {a.push(...ids) } return a}, []),
-          [QueryOperator.ne]:  (value: QueryFilter<T>['value']) => Object.entries(indexData).reduce(
-            (a, [val, ids]) => { if(value !== val) {a.push(...ids) } return a}, []),
-        }[filter.operator](filter.value)
-      }
-      const ids = indexData[]
-      if (possibleMatches.size === 0) {
-        possibleMatches.add(...indexData)
-      }
-    }
-    while (possibleMatches.size > 1 && i <= indexes.length)
-  }
-
-  // private static async generateIndex<T extends Model>(index: ModelIndex) {
-  //   const idIndex = await this.readIndexFromStorage(
-  //     this._getIndexMetadata().get('_id'),
-  //   );
-
-  //   const fields = index.fields as (keyof T)[];
-
-  //   const ids = Object.keys(idIndex);
-
-  //   // Creates the following data structure
-  //   // {
-  //   //   ...index.fields[0]: {
-  //   //     ...index.fields[1]: {
-  //   //       ...: [...ids]
-  //   //     }
-  //   //   }
-  //   // }
-  //   const generateIndexLayer = (i: number, entities: T[]) => {
-  //     const field = fields[i];
-  //     const lastField = i === fields.length - 1;
-
-  //     interface LayerEntries<T> {
-  //       [value: string | number | symbol]: (T | string)[] | undefined;
-  //     }
-
-  //     const entries = entities.reduce<LayerEntries<T>>((entries, entity) => {
-  //       const val = entity[field] as string | number | symbol;
-
-  //       if (entries[val] === undefined) {
-  //         entries[val] = [];
-  //       }
-
-  //       entries[val].push(lastField ? entity.id : entity);
-
-  //       return entries;
-  //     }, {});
-
-  //     const layer: Record<any, unknown> = {};
-
-  //     if (!lastField) {
-  //       for (const [uniqueVal, entities] of Object.entries(entries)) {
-  //         layer[uniqueVal] = generateIndexLayer(i + 1, entities as T[]);
-  //       }
-  //     }
-
-  //     return layer;
-  //   };
-
-  // const indexes = await Promise.all({ })
-  // const entity = await this.readEntityFromStorage(id)
-  // }
-
-  // private static updateIndexes<T extends Model>(entity: T) {
-  //   const indexes = (entity.constructor as typeof Model)._getIndexesByField();
-
-  //   for (const index of indexes) {
-  //     const indexObject = this.readIndex
-  //   }
-
-  // }
 
   // #endregion
 
@@ -361,38 +146,101 @@ export class Model {
   public static query<T extends typeof Model>(
     this: ThisConstructor<T>,
   ): Query<This<T>, T> {
-    return Query.for<This<T>, T>(this);
+    return Query.for<T>(this);
   }
 
-  public static async findById<T extends typeof Model>(
+  protected static filterRecord<T extends Record<string, any>>(
+    record: Record<any, any>,
+    filter: QueryFilter<T>[],
+  ): boolean {
+    return filter.every((f) => compare(record[f.field], f.operator, f.value));
+  }
+
+  public static async findById<T extends ThisConstructor<typeof Model>>(
     this: T,
     id: string,
   ): Promise<This<T> | null> {
-    const data = await this.readEntityFromStorage<This<T>>(id);
+    const data = await this.readEntityFromStorage(id);
 
-    if (data === null) {
-      return null;
+    return data === null ? null : this.create<T>(data as OmitBaseModel<T>);
+  }
+
+  public static async first<T extends ThisConstructor<typeof Model>>(
+    this: T,
+  ): Promise<This<T>[]>;
+  public static async first<T extends ThisConstructor<typeof Model>>(
+    this: T,
+    query: Query<This<T>, T>,
+  ): Promise<This<T>[]>;
+  public static async first<T extends ThisConstructor<typeof Model>>(
+    this: T,
+    query?: Query<This<T>, T>,
+  ): Promise<This<T> | null> {
+    const { filter } = query.build();
+
+    (await this.list()).find(async (id) => {
+      const entity = await this.readEntityFromStorage(id);
+
+      if (entity === null) {
+        return null;
+      }
+
+      for (const condition of filter) {
+        if (
+          compare(
+            entity[condition.field as string],
+            condition.operator,
+            condition.value,
+          )
+        ) {
+          return this.create(entity as OmitBaseModel<T>);
+        }
+      }
+    });
+
+    return null;
+  }
+
+  public static async find<T extends ThisConstructor<typeof Model>>(
+    this: T,
+  ): Promise<This<T>[]>;
+  public static async find<T extends ThisConstructor<typeof Model>>(
+    this: T,
+    query: Query<This<T>, T>,
+  ): Promise<This<T>[]>;
+  public static async find<T extends ThisConstructor<typeof Model>>(
+    this: T,
+    query?: Query<This<T>, T>,
+  ): Promise<This<T>[]> {
+    let _query: Query<This<T>, T>;
+
+    if (query === undefined) {
+      _query = this.query<T>();
+    } else {
+      _query = query;
     }
 
-    return this.create<T>(data);
+    const { filter } = _query.build();
+
+    const entities = await Promise.all(
+      (await this.list()).map<Promise<Record<string, any> | null>>(
+        async (id) => {
+          const entity = await this.readEntityFromStorage(id);
+
+          return this.filterRecord(entity, filter) ? entity : null;
+        },
+      ),
+    );
+
+    return entities
+      .filter((entity) => entity !== null)
+      .map((entity) => this.create<T>(entity as OmitBaseModel<T>));
   }
 
-  public static async findFirst<T extends typeof Model>(
-    this: ThisConstructor<T>,
-    filter: QueryFilter<This<T>>[],
-  ): Promise<This<T> | null> {
-    const id = await this.getIdFromIndexes(null, filter);
-
-    return this.findById(id);
-  }
-
-  public static async findAll<T extends typeof Model>(
-    this: ThisConstructor<T>,
-    filter: QueryFilter<This<T>>[],
-  ): Promise<This<T>[]> {
-    const ids = await this.getIdsFromIndexes(filter);
-
-    return Promise.all(ids.map((id) => this.findById<T>(id)));
+  public static async list(): Promise<string[]> {
+    return (await this._storage.getKeys(this.getStorageKey())).map((id) =>
+      id.replace(new RegExp(`^${this.name}:`), ''),
+    );
   }
 
   // #endregion
@@ -400,33 +248,36 @@ export class Model {
   // #region Data and Saving
 
   public fill(data: Partial<Omit<this, keyof Model>>): this {
-    const requiredAttributes = (
-      this.constructor as typeof Model
-    )._getRequiredAttributes();
-    const fillableAttributes = (
-      this.constructor as typeof Model
-    )._getFillableAttributes();
-
-    const filteredDataEntries = Object.entries(data).filter(([key]) =>
-      fillableAttributes.includes(key),
+    const requiredAttributes = ModelAttribute.getRequired(
+      this.constructor as typeof Model,
     );
-
+    const fillableAttributes = ModelAttribute.getFillable(
+      this.constructor as typeof Model,
+    );
+    
+    const filteredDataEntries = Object.entries(data).filter(
+      ([key]) => fillableAttributes.find((attr) => attr.name === key) !== undefined,
+    );
+    
     const filteredKeys = filteredDataEntries.map(([key]) => key);
     const dataValid =
       this.id === undefined &&
-      requiredAttributes.every((attr) => filteredKeys.includes(attr));
+      requiredAttributes.every((attr) => filteredKeys.includes(attr.name));
 
     if (this.id === undefined && !dataValid) {
       throw new Error(
-        `Attempted to create ${this._name} entity but data is invalid\n` +
-          `Missing the following fields:\n${requiredAttributes.filter((attr) => !filteredKeys.includes(attr)).join('\n - ')}`,
+        `Attempted to create ${this.constructor.name} entity but data is invalid\n` +
+          `Missing the following fields:\n${requiredAttributes
+            .filter((attr) => !filteredKeys.includes(attr.name))
+            .map((attr) => attr.name)
+            .join('\n - ')}`,
       );
     }
 
     return Object.assign(this, Object.fromEntries(filteredDataEntries));
   }
 
-  public async save(): Promise<boolean> {
+  public async save(): Promise<true> {
     this.id = await (
       this.constructor as typeof Model
     ).writeEntityToStorage<Model>(this);
@@ -445,10 +296,25 @@ export class Model {
 
   public toObject(): Object {
     return Object.fromEntries(
-      (this.constructor as typeof Model)
-        ._getAttributes()
-        .map((attribute) => [attribute, this[attribute as keyof this]]),
+      ModelAttribute.getFields(this.constructor as typeof Model).map(
+        (attribute) => [attribute.name, this[attribute.name as keyof this]],
+      ),
     );
+  }
+
+  public static serialize(data: Record<string, any>): string {
+    return this._config.serialization.serialize(data);
+  }
+
+  public serialize(): string {
+    return (this.constructor as typeof Model).serialize(this.toObject());
+  }
+
+  public static deserialize<T extends ThisConstructor<typeof Model>>(
+    this: T,
+    data: Buffer | string,
+  ): Record<string, any> {
+    return this._config.serialization.deserialize(data.toString());
   }
 
   // #endregion

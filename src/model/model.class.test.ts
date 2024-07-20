@@ -3,6 +3,7 @@ import { Model } from './model.class';
 import { DataTestModel } from '../../testing/data-test-model.model';
 import memoryDriver from 'unstorage/drivers/memory';
 import { Query } from '../query/query.class';
+import { ModelAttribute } from '../attributes/model-attribute.class';
 
 const defaultModelConfig = Model['_config'];
 
@@ -49,6 +50,8 @@ describe('Model Class', () => {
       obj: { key: 'value' },
       optional: 'Optional',
     });
+
+    DataTestModel.find();
 
     expect(generateIdMock).toHaveBeenCalled();
     expect(newInstance.id).toBeDefined();
@@ -321,29 +324,6 @@ describe('Model Class', () => {
     expect(DataTestModel['getStorageKey']('someId')).toBe(
       'DataTestModel:someId',
     );
-  });
-
-  it('dynamically generates an index storage key based on the model class name', () => {
-    expect(DataTestModel['getIndexKey']()).toBe('DataTestModel:_indexes');
-  });
-
-  it('dynamically generates a data storage key based on the model class and index names', () => {
-    expect(
-      DataTestModel['getIndexKey']({
-        name: 'testIndex',
-        fields: [],
-        unique: false,
-      }),
-    ).toBe('DataTestModel:_indexes:testIndex');
-  });
-
-  it('dynamically generates a data storage key based on the model class and multiple index names', () => {
-    expect(
-      DataTestModel['getIndexKey']([
-        { name: 'testIndex1', fields: [], unique: false },
-        { name: 'testIndex2', fields: [], unique: false },
-      ]),
-    ).toBe('DataTestModel:_indexes:testIndex1__testIndex2');
   });
 
   it('extracts attributes to a plain object', () => {

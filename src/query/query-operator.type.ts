@@ -5,5 +5,4 @@ export enum QueryOperator {
   gt = '>',
   gte = '>=',
   ne = '!=',
-  in = 'in',
 }

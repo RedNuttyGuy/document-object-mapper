@@ -1,7 +1,7 @@
 import { CustomType } from '../../testing/custom-type.class';
 import { AttributeTestModel } from '../../testing/attribute-test-model.model';
 import { Attribute, attributesMetadataKey } from './attribute.decorator';
-import { ModelAttribute } from './model-attribute.interface';
+import type { ModelAttribute } from './model-attribute.class';
 
 describe('Attribute Decorator', () => {
   const getTestModelAttributes = (): Map<string, ModelAttribute> =>
@@ -23,11 +23,13 @@ describe('Attribute Decorator', () => {
           name: expect.any(String),
           type: expect.any(String),
           optional: expect.any(Boolean),
+          fillable: expect.any(Boolean),
         },
         {
           name: expect.any(String),
           type: expect.any(Function),
           optional: expect.any(Boolean),
+          fillable: expect.any(Boolean),
         },
       ]).toContainEqual(metadata);
     }
@@ -86,7 +88,7 @@ describe('Attribute Decorator', () => {
 
     const overriddenTypeAttribute = attributes.get('overriddenTypeAttribute');
 
-    const reflectedType = typeof Reflect.getMetadata(
+    const reflectedType: string = typeof Reflect.getMetadata(
       'design:type',
       AttributeTestModel.prototype,
       'overriddenTypeAttribute',

@@ -1,7 +1,7 @@
 import { Model } from '../model/model.class';
 import type { Typeof } from '../types/typeof.type';
-import { attributesMetadataKey } from './attribute.decorator';
 import { AttributeOptions } from './attribute-options.interface';
+import { attributesMetadataKey } from './attribute.decorator';
 
 /**
  * Represents a model attribute.
@@ -12,7 +12,7 @@ export class ModelAttribute {
     { type, optional = false, fillable = true }: AttributeOptions,
   ) {
     if (type === undefined) {
-      type = 'undefined'
+      type = 'undefined';
     }
 
     this.name = name;
@@ -26,13 +26,35 @@ export class ModelAttribute {
   public readonly optional: boolean;
   public readonly fillable: boolean;
 
+  private static readonly initializedModels: Set<Function> = new Set();
+
+  public static set<T extends Function>(
+    model: T,
+    property: string,
+    attribute: ModelAttribute,
+  ) {
+    let attributes: Map<string, ModelAttribute> =
+      Reflect.getMetadata(attributesMetadataKey, model) ?? new Map();
+
+    const isInitialized = this.initializedModels.has(model);
+
+    if (!isInitialized || attributes === undefined) {
+      // Copy attributes to prevent overriding base class prototype
+      attributes = new Map(attributes);
+    }
+
+    attributes.set(property, attribute);
+
+    Reflect.defineMetadata(attributesMetadataKey, attributes, model);
+  }
+
   /**
    * Get a name -> `ModelAttribute` Map all model attributes.
    *
    * @param model The model to get attributes from.
    * @returns A map of model attributes.
    */
-  public static get<T extends typeof Model>(
+  private static get<T extends typeof Model>(
     model: T,
   ): Map<string, ModelAttribute> {
     return Reflect.getMetadata(attributesMetadataKey, model) as Map<
@@ -47,8 +69,14 @@ export class ModelAttribute {
    * @param model The model to get attributes from.
    * @returns An array of model attributes.
    */
-  public static getFields<T extends typeof Model>(model: T): ModelAttribute[] {
-    return Array.from(this.get(model).values());
+  public static getFields<T extends typeof Model>(
+    model: T,
+  ): ModelAttribute[] | undefined {
+    const attributes = this.get(model);
+
+    return attributes !== undefined
+      ? Array.from(attributes.values())
+      : undefined;
   }
 
   /**
@@ -59,10 +87,14 @@ export class ModelAttribute {
    */
   public static getFillable<T extends typeof Model>(
     model: T,
-  ): ModelAttribute[] {
-    return Array.from(this.get(model).entries())
-      .filter(([, attr]) => attr.fillable)
-      .map(([, attr]) => attr);
+  ): ModelAttribute[] | undefined {
+    const attributes = this.get(model);
+
+    return attributes !== undefined
+      ? Array.from(attributes.entries())
+          .filter(([, attr]) => attr.fillable)
+          .map(([, attr]) => attr)
+      : undefined;
   }
 
   /**
@@ -73,9 +105,13 @@ export class ModelAttribute {
    */
   public static getRequired<T extends typeof Model>(
     model: T,
-  ): ModelAttribute[] {
-    return Array.from(this.get(model).entries())
-      .filter(([, attr]) => attr.fillable && !attr.optional)
-      .map(([, attr]) => attr);
+  ): ModelAttribute[] | undefined {
+    const attributes = this.get(model);
+
+    return attributes !== undefined
+      ? Array.from(attributes.entries())
+          .filter(([, attr]) => attr.fillable && !attr.optional)
+          .map(([, attr]) => attr)
+      : undefined;
   }
 }

@@ -20,6 +20,14 @@
       "strictNullChecks": true
   },
   "include": [
-      "index.ts"
+      "index.ts",
+      "src",
+      "testing",
+      "jest.setup.ts",
+      "jest.config.ts"
+  ],
+    "exclude": [
+        "dist",
+        "node_modules"
     ]
 }

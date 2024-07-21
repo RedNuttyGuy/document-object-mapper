@@ -1,7 +1,8 @@
 import { CustomType } from '../../testing/custom-type.class';
+import { EmptyTestModel } from '../../testing/empty-test-model.class';
 import { AttributeTestModel } from '../../testing/attribute-test-model.model';
 import { Attribute, attributesMetadataKey } from './attribute.decorator';
-import type { ModelAttribute } from './model-attribute.class';
+import { ModelAttribute } from './model-attribute.class';
 
 describe('Attribute Decorator', () => {
   const getTestModelAttributes = (): Map<string, ModelAttribute> =>
@@ -102,7 +103,9 @@ describe('Attribute Decorator', () => {
   });
 
   it('throws an error when a symbol property is used', () => {
-    expect(() => Attribute()(undefined, Symbol('test'))).toThrow(
+    expect(() =>
+      Attribute()(EmptyTestModel.create({}), Symbol('test')),
+    ).toThrow(
       "Property 'test' cannot be used as an attribute. Defining symbol properties as attributes is not supported",
     );
   });

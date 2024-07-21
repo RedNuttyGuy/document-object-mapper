@@ -391,7 +391,14 @@ describe('Model Class', () => {
     const retrievedInstance = await DataTestModel.findById(newInstance.id);
 
     expect(retrievedInstance).toBeDefined();
+    expect(retrievedInstance).not.toBeNull();
     expect(retrievedInstance).toBeInstanceOf(DataTestModel);
+
+    // Tested by .toBeDefined and .not.toBeNull above
+    if (retrievedInstance === undefined || retrievedInstance === null) {
+      return;
+    }
+
     expect(retrievedInstance.toObject()).toEqual({
       ...testData,
       id: newInstance.id,
@@ -419,6 +426,7 @@ describe('Model Class', () => {
     expect(newInstance.id).toBeDefined();
 
     const oldId = newInstance.id;
+    // @ts-expect-error
     newInstance.id = undefined;
 
     expect(newInstance.id).toBeUndefined();

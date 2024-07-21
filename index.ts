@@ -1,4 +1,4 @@
-import 'reflect-metadata'; 
+import 'reflect-metadata';
 
 export { Model } from './src/model/model.class';
 export type { ModelConfig } from './src/model/model-config.interface';

@@ -1,4 +1,4 @@
-import type { Model } from 'src/model/model.class';
+import { Model } from 'src/model/model.class';
 import type { AttributeOptions } from './attribute-options.interface';
 import { ModelAttribute } from './model-attribute.class';
 
@@ -17,24 +17,16 @@ export function Attribute(options?: AttributeOptions) {
       );
     }
 
-    const attributes: Map<string, ModelAttribute> =
-      Reflect.getMetadata(attributesMetadataKey, target.constructor) ??
-      new Map();
-
-    const attribute: ModelAttribute = new ModelAttribute(propertyKey, {
-      type:
-        options?.type ??
-        typeof Reflect.getMetadata('design:type', target, propertyKey)(),
-      optional: options?.optional,
-      fillable: options?.fillable ?? true,
-    });
-
-    attributes.set(propertyKey, attribute);
-
-    Reflect.defineMetadata(
-      attributesMetadataKey,
-      attributes,
+    ModelAttribute.set(
       target.constructor,
+      propertyKey,
+      new ModelAttribute(propertyKey, {
+        type:
+          options?.type ??
+          typeof Reflect.getMetadata('design:type', target, propertyKey)(),
+        optional: options?.optional,
+        fillable: options?.fillable ?? true,
+      }),
     );
   };
 }

@@ -52,7 +52,7 @@ export class Query<T extends Model, TModel extends typeof Model> {
 
   public async first(
     this: Query<This<TModel>, TModel>,
-  ): Promise<This<TModel>[]> {
+  ): Promise<This<TModel> | null> {
     return this._model.first<TModel>(this);
   }
 

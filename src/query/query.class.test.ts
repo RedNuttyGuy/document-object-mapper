@@ -9,7 +9,7 @@ const staticFindMock = jest
   .mockImplementation(() => Promise.resolve([]));
 const staticFirstMock = jest
   .spyOn(Model, 'first')
-  .mockImplementation(() => Promise.resolve(undefined));
+  .mockImplementation(() => Promise.resolve(null));
 
 describe('Query Builder', () => {
   const createTestQuery = (): Query<DataTestModel, typeof DataTestModel> => {

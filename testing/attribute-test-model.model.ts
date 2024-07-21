@@ -22,7 +22,7 @@ export class AttributeTestModel extends Model {
   customAttribute: CustomType;
 
   @Attribute({ optional: true })
-  optionalAttribute: string;
+  optionalAttribute?: string;
 
   @Attribute({ type: 'boolean' })
   overriddenTypeAttribute: string;

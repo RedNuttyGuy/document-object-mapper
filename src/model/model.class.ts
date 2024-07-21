@@ -55,9 +55,9 @@ export class Model {
       set(target, p, newValue, receiver) {
         if (
           typeof p !== 'symbol' &&
-          ModelAttribute.getFields(target.constructor as typeof Model).find(
+          ModelAttribute.getFields(target.constructor as typeof Model)?.find(
             (attr) => attr.name === p,
-          ) !== null
+          ) !== undefined
         ) {
           target._dirty.add(p);
         }
@@ -238,7 +238,7 @@ export class Model {
    */
   public static async first<T extends ThisConstructor<typeof Model>>(
     this: T,
-  ): Promise<This<T>[]>;
+  ): Promise<This<T> | null>;
   /**
    * Find the first Model instance that matches the provided query.
    *
@@ -248,7 +248,7 @@ export class Model {
   public static async first<T extends ThisConstructor<typeof Model>>(
     this: T,
     query: Query<This<T>, T>,
-  ): Promise<This<T>[]>;
+  ): Promise<This<T> | null>;
   public static async first<T extends ThisConstructor<typeof Model>>(
     this: T,
     query?: Query<This<T>, T>,
@@ -365,6 +365,12 @@ export class Model {
       this.constructor as typeof Model,
     );
 
+    if (requiredAttributes === undefined || fillableAttributes === undefined) {
+      throw new Error(
+        `Cannot find attributes for class ${this.constructor.name}`,
+      );
+    }
+
     const filteredDataEntries = Object.entries(data).filter(
       ([key]) =>
         fillableAttributes.find((attr) => attr.name === key) !== undefined,
@@ -378,7 +384,7 @@ export class Model {
     if (this.id === undefined && !dataValid) {
       throw new Error(
         `Attempted to create ${this.constructor.name} entity but data is invalid\n` +
-          `Missing the following fields:\n${requiredAttributes
+          `Missing the following fields:\n - ${requiredAttributes
             .filter((attr) => !filteredKeys.includes(attr.name))
             .map((attr) => attr.name)
             .join('\n - ')}`,
@@ -415,9 +421,9 @@ export class Model {
    */
   public toObject(): Object {
     return Object.fromEntries(
-      ModelAttribute.getFields(this.constructor as typeof Model).map(
+      ModelAttribute.getFields(this.constructor as typeof Model)?.map(
         (attribute) => [attribute.name, this[attribute.name as keyof this]],
-      ),
+      ) ?? [],
     );
   }
 

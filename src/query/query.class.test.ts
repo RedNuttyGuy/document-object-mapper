@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { Query } from './query.class';
 import { DataTestModel } from '../../testing/data-test-model.model';
-import { QueryOperator } from './query-operator.type';
+import { QueryOperator } from './query-operator.enum';
 import { Model } from '../model/model.class';
 
 const staticFindMock = jest

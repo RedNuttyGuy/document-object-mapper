@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { QueryOperator } from './query-operator.type';
+import { QueryOperator } from './query-operator.enum';
 import { compare } from './compare.function';
 
 describe('Compare function', () => {

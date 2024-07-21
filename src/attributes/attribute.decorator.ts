@@ -1,13 +1,15 @@
 import type { Model } from 'src/model/model.class';
-import type { ModelAttributeOptions } from './model-attribute-options.interface';
+import type { AttributeOptions } from './attribute-options.interface';
 import { ModelAttribute } from './model-attribute.class';
 
 export const attributesMetadataKey = Symbol('model.attributes');
 
 /**
- * Defines a property as a Serializable attribute
+ * Defines a property as a serializable or deserializable attribute
+ *
+ * @param options - Options for the attribute.
  */
-export function Attribute(options?: ModelAttributeOptions) {
+export function Attribute(options?: AttributeOptions) {
   return function (target: Model, propertyKey: string | symbol) {
     if (typeof propertyKey === 'symbol') {
       throw new Error(

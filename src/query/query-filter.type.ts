@@ -1,4 +1,4 @@
-import { QueryOperator } from './query-operator.type';
+import { QueryOperator } from './query-operator.enum';
 
 export type QueryFilter<T extends Record<string, any>> = {
   [K in keyof T]: {

@@ -1,16 +1,15 @@
 import 'reflect-metadata';
 import { Model } from './model.class';
 import { DataTestModel } from '../../testing/data-test-model.model';
-import memoryDriver from 'unstorage/drivers/memory';
 import { Query } from '../query/query.class';
-import { ModelAttribute } from '../attributes/model-attribute.class';
 
 const defaultModelConfig = Model['_config'];
 
 describe('Model Class', () => {
   beforeAll(() => {
     Model.configure({
-      storageDriver: memoryDriver(),
+      inMemory: true,
+      baseDirectory: 'test',
     });
   });
 

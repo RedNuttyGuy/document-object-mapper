@@ -6,4 +6,5 @@ export type Typeof =
   | 'object'
   | 'string'
   | 'symbol'
-  | 'undefined';
+  | 'undefined'
+  | undefined;

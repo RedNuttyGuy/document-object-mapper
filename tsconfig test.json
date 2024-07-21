@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-      "module": "CommonJS",
+      "module": "commonjs",
       "experimentalDecorators": true,
       "emitDecoratorMetadata": true,
       "esModuleInterop": true,
@@ -11,15 +11,13 @@
       "sourceMap": true,
       "outDir": "dist",
       "baseUrl": ".",
-      "skipLibCheck": true,
-      "declaration": true,
-      "noFallthroughCasesInSwitch": true,
-      "noImplicitReturns": true,
-      "noUnusedLocals": true,
-      "pretty": true,
-      "strictNullChecks": true
+      "skipLibCheck": true
   },
   "include": [
-      "index.ts"
+      "src/**/*",
+      "testing/**/*",
+      "index.ts",
+      "jest.setup.ts",
+      "jest.config.ts"
     ]
 }

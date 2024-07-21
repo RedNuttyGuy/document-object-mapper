@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { type Storage, createStorage } from 'unstorage';
+import memoryDriver from 'unstorage/drivers/memory';
 import fsLiteDriver from 'unstorage/drivers/fs-lite';
 
 import type { ModelConfig } from './model-config.interface';
@@ -14,11 +15,13 @@ import { compare } from '../query/compare.function';
 
 import type { This } from '../types/this.type';
 import type { ThisConstructor } from '../types/this-constructor.type';
-import type { OmitBaseModel } from '../types/extended-model.type';
 
 export class Model {
   // #region Default fields
 
+  /**
+   * The ID of the Model instance. This is set on creation and should not be modified.
+   */
   @Attribute({ fillable: false })
   public id: string;
 
@@ -26,11 +29,20 @@ export class Model {
 
   // #region Creation
 
+  /**
+   * Models must be created using the `create` method, as it relies on the Proxy API for extended functionality.
+   */
   protected constructor() {}
 
+  /**
+   * Creates a new instance of the model and fills it with the provided data.
+   *
+   * @param data The data to fill the model with.
+   * @returns A new instance of the model.
+   */
   public static create<T extends ThisConstructor<typeof Model>>(
     this: T,
-    data: OmitBaseModel<T>,
+    data: Omit<This<T>, keyof Model>,
   ): This<T> {
     const instance: Model = new this();
 
@@ -55,12 +67,22 @@ export class Model {
     });
   }
 
+  /**
+   * Generate a new Model ID.
+   *
+   * @returns A new Model ID.
+   */
   protected static generateId(): string {
     return randomUUID();
   }
 
   private _dirty: Set<string> = new Set();
 
+  /**
+   * The fields that have been modified since the last save.
+   *
+   * @returns An array of field names that have been modified.
+   */
   public get dirty(): string[] {
     return Array.from(this._dirty.values());
   }
@@ -70,7 +92,8 @@ export class Model {
   // #region Config
 
   private static _config: ModelConfig = {
-    storageDriver: fsLiteDriver({ base: 'db' }),
+    inMemory: false,
+    baseDirectory: 'db',
     preventFillingWithExtraAttributes: true,
     serialization: {
       serialize: (data) => JSON.stringify(data, null, 2),
@@ -79,6 +102,19 @@ export class Model {
   };
 
   private static _configured = false;
+
+  private static _storage: Storage = createStorage({
+    driver: fsLiteDriver({ base: this._config.baseDirectory }),
+  });
+
+  /**
+   * Configure the Model class.
+   *
+   * Note: This will recreate the underlying storage driver of the Model class.
+   *
+   * @param config The configuration options for the Model class. Options will be merged with the default configuration.
+   * @throws `Error` if the Model class has already been configured.
+   */
   public static configure<T extends ThisConstructor<typeof Model>>(
     this: T,
     config: Partial<ModelConfig>,
@@ -91,24 +127,33 @@ export class Model {
 
     this._config = { ...this._config, ...config };
 
-    if (config.storageDriver !== undefined) {
+    if (config.baseDirectory !== undefined) {
       this._storage = createStorage({
-        driver: this._config.storageDriver,
+        driver: config.inMemory
+          ? memoryDriver()
+          : fsLiteDriver({ base: this._config.baseDirectory }),
       });
     }
 
     this._configured = true;
   }
 
-  private static _storage: Storage = createStorage({
-    driver: this._config.storageDriver,
-  });
-
   // #endregion
 
   // #region Persistance
 
+  /**
+   * Get the base storage key for the Model class. All instances are stored under this key.
+   *
+   * @returns The storage key for the Model class.
+   */
   public static getStorageKey(): string;
+  /**
+   * Get the full storage key for a specific Model instance.
+   *
+   * @param id The ID of the Model instance.
+   * @returns The storage key for the Model instance.
+   */
   public static getStorageKey(id: string): string;
   public static getStorageKey(id?: string): string {
     const key = this.name;
@@ -143,12 +188,24 @@ export class Model {
 
   // #region Queries
 
+  /**
+   * Create a new query instance for the Model class.
+   *
+   * @returns A `Query` instance bound to the Model class it was called from.
+   */
   public static query<T extends typeof Model>(
     this: ThisConstructor<T>,
   ): Query<This<T>, T> {
     return Query.for<T>(this);
   }
 
+  /**
+   * Determine if an object matches the provided filter.
+   *
+   * @param record The object to check.
+   * @param filter The filter to apply to the object.
+   * @returns `true` if the object matches the filter, otherwise `false`.
+   */
   protected static filterRecord<T extends Record<string, any>>(
     record: Record<any, any>,
     filter: QueryFilter<T>[],
@@ -156,18 +213,38 @@ export class Model {
     return filter.every((f) => compare(record[f.field], f.operator, f.value));
   }
 
+  /**
+   * Find a Model instance by its ID.
+   *
+   * @param id The ID of the Model instance to find.
+   * @returns The Model instance if found, otherwise `null`.
+   */
   public static async findById<T extends ThisConstructor<typeof Model>>(
     this: T,
     id: string,
   ): Promise<This<T> | null> {
     const data = await this.readEntityFromStorage(id);
 
-    return data === null ? null : this.create<T>(data as OmitBaseModel<T>);
+    return data === null
+      ? null
+      : this.create<T>(data as Omit<This<T>, keyof Model>);
   }
 
+  /**
+   * Find a Model instance.
+   *
+   * @param query The query to match against.
+   * @returns The first Model instance found, otherwise `null`.
+   */
   public static async first<T extends ThisConstructor<typeof Model>>(
     this: T,
   ): Promise<This<T>[]>;
+  /**
+   * Find the first Model instance that matches the provided query.
+   *
+   * @param query The query to match against.
+   * @returns The first Model instance that matches the query, otherwise `null`.
+   */
   public static async first<T extends ThisConstructor<typeof Model>>(
     this: T,
     query: Query<This<T>, T>,
@@ -176,13 +253,17 @@ export class Model {
     this: T,
     query?: Query<This<T>, T>,
   ): Promise<This<T> | null> {
-    const { filter } = query.build();
+    const { filter = undefined } = query?.build() ?? {};
 
-    (await this.list()).find(async (id) => {
+    for (const id of await this.list()) {
       const entity = await this.readEntityFromStorage(id);
 
       if (entity === null) {
-        return null;
+        continue;
+      }
+
+      if (query === undefined || filter === undefined) {
+        return this.create(entity as Omit<This<T>, keyof Model>);
       }
 
       for (const condition of filter) {
@@ -193,17 +274,28 @@ export class Model {
             condition.value,
           )
         ) {
-          return this.create(entity as OmitBaseModel<T>);
+          return this.create(entity as Omit<This<T>, keyof Model>);
         }
       }
-    });
+    }
 
     return null;
   }
 
+  /**
+   * Get all Model instances.
+   *
+   * @returns An array of all Model instances
+   */
   public static async find<T extends ThisConstructor<typeof Model>>(
     this: T,
   ): Promise<This<T>[]>;
+  /**
+   * Find all Model instances that match the provided query.
+   *
+   * @param query The query to search against.
+   * @returns An array of Model instances that match the query.
+   */
   public static async find<T extends ThisConstructor<typeof Model>>(
     this: T,
     query: Query<This<T>, T>,
@@ -227,6 +319,10 @@ export class Model {
         async (id) => {
           const entity = await this.readEntityFromStorage(id);
 
+          if (entity === null) {
+            return null;
+          }
+
           return this.filterRecord(entity, filter) ? entity : null;
         },
       ),
@@ -234,9 +330,14 @@ export class Model {
 
     return entities
       .filter((entity) => entity !== null)
-      .map((entity) => this.create<T>(entity as OmitBaseModel<T>));
+      .map((entity) => this.create<T>(entity as Omit<This<T>, keyof Model>));
   }
 
+  /**
+   * List all Model IDs.
+   *
+   * @returns An array of all Model IDs.
+   */
   public static async list(): Promise<string[]> {
     return (await this._storage.getKeys(this.getStorageKey())).map((id) =>
       id.replace(new RegExp(`^${this.name}:`), ''),
@@ -247,6 +348,15 @@ export class Model {
 
   // #region Data and Saving
 
+  /**
+   * Fill the Model instance with the provided data.
+   *
+   * All required fields must be provided when filling a new Model instance.
+   *
+   * @param data The data to fill the Model instance with. Attributes that are not `fillable` are stripped before setting the data.
+   * @returns The Model instance overwritten with the provided data.
+   * @throws `Error` if the data is invalid.
+   */
   public fill(data: Partial<Omit<this, keyof Model>>): this {
     const requiredAttributes = ModelAttribute.getRequired(
       this.constructor as typeof Model,
@@ -254,11 +364,12 @@ export class Model {
     const fillableAttributes = ModelAttribute.getFillable(
       this.constructor as typeof Model,
     );
-    
+
     const filteredDataEntries = Object.entries(data).filter(
-      ([key]) => fillableAttributes.find((attr) => attr.name === key) !== undefined,
+      ([key]) =>
+        fillableAttributes.find((attr) => attr.name === key) !== undefined,
     );
-    
+
     const filteredKeys = filteredDataEntries.map(([key]) => key);
     const dataValid =
       this.id === undefined &&
@@ -277,15 +388,17 @@ export class Model {
     return Object.assign(this, Object.fromEntries(filteredDataEntries));
   }
 
+  /**
+   * Persist the Model instance to storage.
+   *
+   * @returns `true` if the Model instance was saved successfully.
+   */
   public async save(): Promise<true> {
     this.id = await (
       this.constructor as typeof Model
     ).writeEntityToStorage<Model>(this);
 
     this._dirty.clear();
-
-    // (this.constructor as typeof Model)
-    //   .updateIndexes(this)
 
     return true;
   }
@@ -294,6 +407,12 @@ export class Model {
 
   // #region Transforms
 
+  /**
+   * Convert the Model instance to a plain object.
+   * Only contains properties that are defined as attributes.
+   *
+   * @returns A plain object representation of the Model instance.
+   */
   public toObject(): Object {
     return Object.fromEntries(
       ModelAttribute.getFields(this.constructor as typeof Model).map(
@@ -302,14 +421,31 @@ export class Model {
     );
   }
 
+  /**
+   * Convert an object to a string using the Model's serialization function.
+   *
+   * @param data The data to serialize.
+   * @returns The serialized data.
+   */
   public static serialize(data: Record<string, any>): string {
     return this._config.serialization.serialize(data);
   }
 
+  /**
+   * Convert the current Model instance to a string.
+   *
+   * @returns The serialized Model instance.
+   */
   public serialize(): string {
     return (this.constructor as typeof Model).serialize(this.toObject());
   }
 
+  /**
+   * Convert a string to an object using the Model's deserialization function.
+   *
+   * @param data The string to deserialize.
+   * @returns An object created from the provided data.
+   */
   public static deserialize<T extends ThisConstructor<typeof Model>>(
     this: T,
     data: Buffer | string,

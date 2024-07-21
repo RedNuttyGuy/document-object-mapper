@@ -1,4 +1,4 @@
-import { QueryOperator } from './query-operator.type';
+import { QueryOperator } from './query-operator.enum';
 import type { QueryFilter } from './query-filter.type';
 import type { CompiledQuery } from './compiled-query.interface';
 import type { Model } from '../model/model.class';

@@ -15,7 +15,8 @@ jobs:
           # Defaults to the user or organization that owns the workflow file
           scope: '@rngnz'
       - run: yarn
+      - run: yarn test
       - run: yarn build
-      - run: yarn npm publish // for Yarn version 1, use `yarn publish` instead
+      - run: yarn publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,33 +1,32 @@
 {
-  "compilerOptions": {
-      "module": "CommonJS",
-      "experimentalDecorators": true,
-      "emitDecoratorMetadata": true,
-      "esModuleInterop": true,
-      "allowSyntheticDefaultImports": true,
-      "target": "es6",
-      "noImplicitAny": true,
-      "moduleResolution": "node",
-      "sourceMap": true,
-      "outDir": "dist",
-      "baseUrl": ".",
-      "skipLibCheck": true,
-      "declaration": true,
-      "noFallthroughCasesInSwitch": true,
-      "noImplicitReturns": true,
-      "noUnusedLocals": true,
-      "pretty": true,
-      "strictNullChecks": true
-  },
-  "include": [
-      "index.ts",
-      "src",
-      "testing",
-      "jest.setup.ts",
-      "jest.config.ts"
-  ],
+    "compilerOptions": {
+        "module": "CommonJS",
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "target": "es6",
+        "noImplicitAny": true,
+        "moduleResolution": "node",
+        "sourceMap": true,
+        "outDir": "dist",
+        "baseUrl": ".",
+        "skipLibCheck": true,
+        "declaration": true,
+        "noFallthroughCasesInSwitch": true,
+        "noImplicitReturns": true,
+        "noUnusedLocals": true,
+        "pretty": true,
+        "strictNullChecks": true
+    },
+    "include": [
+        "index.ts",
+        "src/**/*",
+    ],
     "exclude": [
+        "src/**/*.test.ts",
         "dist",
-        "node_modules"
+        "node_modules",
+        "testing"
     ]
 }

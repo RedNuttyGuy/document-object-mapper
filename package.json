@@ -1,5 +1,5 @@
 {
-  "name": "document-object-mapper",
+  "name": "@rngnz/document-object-mapper",
   "version": "1.0.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

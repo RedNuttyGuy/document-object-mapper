@@ -50,8 +50,6 @@ describe('Model Class', () => {
       optional: 'Optional',
     });
 
-    DataTestModel.find();
-
     expect(generateIdMock).toHaveBeenCalled();
     expect(newInstance.id).toBeDefined();
     // Expected GUID format
@@ -62,7 +60,7 @@ describe('Model Class', () => {
 
   it('throws an error if the model is created with missing data', () => {
     expect(() => {
-      //@ts-expect-error
+      //@ts-expect-error Testing error is thrown if required data is missing
       DataTestModel.create({
         str: 'Test',
         bool: true,
@@ -77,7 +75,7 @@ describe('Model Class', () => {
         str: 'Test',
         bool: true,
         num: 42,
-        //@ts-expect-error
+        //@ts-expect-error Testing error is thrown if extra data is provided
         nonExistent: 'Extra',
       });
     }).toThrow(Error);
@@ -163,68 +161,11 @@ describe('Model Class', () => {
     const id = newInstance.id;
 
     newInstance.fill({
-      //@ts-expect-error
+      //@ts-expect-error testing that filling from stored data with ID sets the ID correctly
       id: 'newid',
     });
 
     expect(newInstance.id).toBe(id);
-  });
-
-  it('adds properties to the dirty list when set', () => {
-    const newInstance = DataTestModel.create({
-      str: 'Test',
-      bool: true,
-      num: 42,
-      obj: { key: 'value' },
-      optional: 'Optional',
-    });
-
-    expect(newInstance.dirty).toEqual([]);
-
-    newInstance.str = 'New Test';
-
-    expect(newInstance.dirty).toEqual(['str']);
-  });
-
-  it('adds properties to the dirty list when filled', () => {
-    const newInstance = DataTestModel.create({
-      str: 'Test',
-      bool: true,
-      num: 42,
-      obj: { key: 'value' },
-      optional: 'Optional',
-    });
-
-    expect(newInstance.dirty).toEqual([]);
-
-    newInstance.fill({
-      str: 'New Test',
-      bool: false,
-    });
-
-    expect(newInstance.dirty).toEqual(['str', 'bool']);
-  });
-
-  it('clears the dirty list when saved', async () => {
-    const newInstance = DataTestModel.create({
-      str: 'Test',
-      bool: true,
-      num: 42,
-      obj: { key: 'value' },
-      optional: 'Optional',
-    });
-
-    newInstance.str = 'New Test';
-    newInstance.bool = false;
-
-    const preSaveDirty = newInstance.dirty;
-    expect(preSaveDirty).toHaveLength(2);
-    expect(preSaveDirty).toContain('str');
-    expect(preSaveDirty).toContain('bool');
-
-    await newInstance.save();
-
-    expect(newInstance.dirty).toHaveLength(0);
   });
 
   it('allows configuration of the model class', () => {
@@ -334,7 +275,7 @@ describe('Model Class', () => {
       optional: 'Optional',
     });
 
-    //@ts-expect-error
+    //@ts-expect-error Testing that extra data is not included in the plain object
     newInstance.extra = 'Extra';
 
     const plain = newInstance.toObject();
@@ -358,7 +299,7 @@ describe('Model Class', () => {
       optional: 'Optional',
     });
 
-    newInstance.save();
+    await newInstance.save();
 
     const modelStorage = DataTestModel['_storage'];
     const storageKey = DataTestModel['getStorageKey'](newInstance.id);
@@ -372,6 +313,7 @@ describe('Model Class', () => {
       optional: 'Optional',
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     expect(modelStorage.getItem(storageKey)).resolves.toEqual(expectedData);
   });
 
@@ -426,7 +368,7 @@ describe('Model Class', () => {
     expect(newInstance.id).toBeDefined();
 
     const oldId = newInstance.id;
-    // @ts-expect-error
+    // @ts-expect-error Testing error condition if id initialization does not occur
     newInstance.id = undefined;
 
     expect(newInstance.id).toBeUndefined();

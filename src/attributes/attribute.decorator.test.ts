@@ -2,7 +2,7 @@ import { CustomType } from '../../testing/custom-type.class';
 import { EmptyTestModel } from '../../testing/empty-test-model.class';
 import { AttributeTestModel } from '../../testing/attribute-test-model.model';
 import { Attribute, attributesMetadataKey } from './attribute.decorator';
-import { ModelAttribute } from './model-attribute.class';
+import type { ModelAttribute } from './model-attribute.class';
 
 describe('Attribute Decorator', () => {
   const getTestModelAttributes = (): Map<string, ModelAttribute> =>
@@ -89,10 +89,12 @@ describe('Attribute Decorator', () => {
 
     const overriddenTypeAttribute = attributes.get('overriddenTypeAttribute');
 
-    const reflectedType: string = typeof Reflect.getMetadata(
-      'design:type',
-      AttributeTestModel.prototype,
-      'overriddenTypeAttribute',
+    const reflectedType: string = typeof (
+      Reflect.getMetadata(
+        'design:type',
+        AttributeTestModel.prototype,
+        'overriddenTypeAttribute',
+      ) as () => any
     )();
 
     expect(reflectedType).toBeDefined();

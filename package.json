@@ -1,16 +1,22 @@
 {
   "name": "@rngnz/document-object-mapper",
+  "description": "An Model first approach for implementing a local document database",
   "version": "1.0.2",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RedNuttyGuy/document-object-mapper"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "files": [
     "/dist"
   ],
   "scripts": {
     "start": "ts-node index.ts",
-    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "test": "jest",
-    "lint": "eslint \"*.ts\" \"**/*.ts\"",
+    "lint": "eslint \"**/*.ts\"",
     "format": "prettier \"*.ts\" \"**/*.ts\""
   },
   "dependencies": {

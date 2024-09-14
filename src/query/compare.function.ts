@@ -8,10 +8,10 @@ import { QueryOperator } from './query-operator.enum';
  * @param b - The second value to compare.
  * @returns `true` if the comparison is true, otherwise `false`.
  */
-export const compare = (
-  a: any,
+export const compare = <T>(
+  a: T,
   op: QueryOperator | `${QueryOperator}`,
-  b: any,
+  b: T,
 ): boolean =>
   ({
     [QueryOperator.eq]: () => a === b,

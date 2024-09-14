@@ -12,7 +12,7 @@ const staticFirstMock = jest
   .mockImplementation(() => Promise.resolve(null));
 
 describe('Query Builder', () => {
-  const createTestQuery = (): Query<DataTestModel, typeof DataTestModel> => {
+  const createTestQuery = (): Query<DataTestModel> => {
     return Query.for(DataTestModel);
   };
 

@@ -1,4 +1,4 @@
-import { Model } from 'src/model/model.class';
+import type { Model } from 'src/model/model.class';
 import type { AttributeOptions } from './attribute-options.interface';
 import { ModelAttribute } from './model-attribute.class';
 
@@ -10,7 +10,7 @@ export const attributesMetadataKey = Symbol('model.attributes');
  * @param options - Options for the attribute.
  */
 export function Attribute(options?: AttributeOptions) {
-  return function (target: Model, propertyKey: string | symbol) {
+  return function (target: Model, propertyKey: string | symbol): void {
     if (typeof propertyKey === 'symbol') {
       throw new Error(
         `Property '${propertyKey.description}' cannot be used as an attribute. Defining symbol properties as attributes is not supported`,
@@ -23,7 +23,9 @@ export function Attribute(options?: AttributeOptions) {
       new ModelAttribute(propertyKey, {
         type:
           options?.type ??
-          typeof Reflect.getMetadata('design:type', target, propertyKey)(),
+          typeof (
+            Reflect.getMetadata('design:type', target, propertyKey) as () => any
+          )(),
         optional: options?.optional,
         fillable: options?.fillable ?? true,
       }),

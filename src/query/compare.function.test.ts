@@ -6,8 +6,10 @@ describe('Compare function', () => {
   it('Compares equality strictly', () => {
     expect(compare(1, QueryOperator.eq, 1)).toBe(true);
 
+    // @ts-expect-error Testing invalid input
     expect(compare(1, QueryOperator.eq, '1')).toBe(false);
 
+    // @ts-expect-error Testing invalid input
     expect(compare('1', QueryOperator.eq, 1)).toBe(false);
 
     expect(compare('1', QueryOperator.eq, '1')).toBe(true);
@@ -32,8 +34,10 @@ describe('Compare function', () => {
   it('Compares inequality strictly', () => {
     expect(compare(1, QueryOperator.ne, 1)).toBe(false);
 
+    // @ts-expect-error Testing invalid input
     expect(compare(1, QueryOperator.ne, '1')).toBe(true);
 
+    // @ts-expect-error Testing invalid input
     expect(compare('1', QueryOperator.ne, 1)).toBe(true);
 
     expect(compare('1', QueryOperator.ne, '1')).toBe(false);

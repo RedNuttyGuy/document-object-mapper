@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { type Storage, createStorage } from 'unstorage';
+import { Driver, type Storage, createStorage } from 'unstorage';
 import memoryDriver from 'unstorage/drivers/memory';
 import fsLiteDriver from 'unstorage/drivers/fs-lite';
 
@@ -13,8 +13,8 @@ import { Query } from '../query/query.class';
 import type { QueryFilter } from '../query/query-filter.type';
 import { compare } from '../query/compare.function';
 
-import type { This } from '../types/this.type';
-import type { ThisConstructor } from '../types/this-constructor.type';
+import { StaticModel } from '../types/static-model.type';
+import { OmitModel } from 'src/types/omit-model';
 
 export class Model {
   // #region Default fields
@@ -29,42 +29,26 @@ export class Model {
 
   // #region Creation
 
-  /**
-   * Models must be created using the `create` method, as it relies on the Proxy API for extended functionality.
-   */
-  protected constructor() {}
+  public constructor(data: OmitModel<unknown>) {
+    this.fill(data);
+
+    this.id =
+      this.id ??
+      (data as { id?: string }).id ??
+      (this.constructor as typeof Model).generateId();
+  }
 
   /**
    * Creates a new instance of the model and fills it with the provided data.
    *
-   * @param data The data to fill the model with.
-   * @returns A new instance of the model.
+   * @param {OmitModel<T>} data The data to fill the model with.
+   * @returns {T} A new instance of the model.
    */
-  public static create<T extends ThisConstructor<typeof Model>>(
-    this: T,
-    data: Omit<This<T>, keyof Model>,
-  ): This<T> {
-    const instance: Model = new this();
-
-    instance.fill(data);
-
-    instance.id =
-      instance.id ?? (data as { id?: string }).id ?? this.generateId();
-
-    return new Proxy<This<T>>(instance, {
-      set(target, p, newValue, receiver) {
-        if (
-          typeof p !== 'symbol' &&
-          ModelAttribute.getFields(target.constructor as typeof Model)?.find(
-            (attr) => attr.name === p,
-          ) !== undefined
-        ) {
-          target._dirty.add(p);
-        }
-
-        return Reflect.set(target, p, newValue, receiver);
-      },
-    });
+  public static create<T extends Model>(
+    this: StaticModel<T>,
+    data: OmitModel<T>,
+  ): T {
+    return new this(data);
   }
 
   /**
@@ -74,17 +58,6 @@ export class Model {
    */
   protected static generateId(): string {
     return randomUUID();
-  }
-
-  private _dirty: Set<string> = new Set();
-
-  /**
-   * The fields that have been modified since the last save.
-   *
-   * @returns An array of field names that have been modified.
-   */
-  public get dirty(): string[] {
-    return Array.from(this._dirty.values());
   }
 
   // #endregion
@@ -104,7 +77,7 @@ export class Model {
   private static _configured = false;
 
   private static _storage: Storage = createStorage({
-    driver: fsLiteDriver({ base: this._config.baseDirectory }),
+    driver: fsLiteDriver({ base: this._config.baseDirectory }) as Driver,
   });
 
   /**
@@ -115,8 +88,8 @@ export class Model {
    * @param config The configuration options for the Model class. Options will be merged with the default configuration.
    * @throws `Error` if the Model class has already been configured.
    */
-  public static configure<T extends ThisConstructor<typeof Model>>(
-    this: T,
+  public static configure<T extends Model>(
+    this: StaticModel<T>,
     config: Partial<ModelConfig>,
   ): void {
     if (this._configured) {
@@ -130,8 +103,8 @@ export class Model {
     if (config.baseDirectory !== undefined) {
       this._storage = createStorage({
         driver: config.inMemory
-          ? memoryDriver()
-          : fsLiteDriver({ base: this._config.baseDirectory }),
+          ? (memoryDriver() as Driver)
+          : (fsLiteDriver({ base: this._config.baseDirectory }) as Driver),
       });
     }
 
@@ -161,10 +134,11 @@ export class Model {
     return id === undefined ? key : `${key}:${id}`;
   }
 
-  private static async readEntityFromStorage<
-    T extends ThisConstructor<typeof Model>,
-  >(this: ThisConstructor<T>, id: string): Promise<Record<string, any> | null> {
-    const data = await this._storage.getItemRaw(this.getStorageKey(id));
+  private static async readEntityFromStorage<T extends Model>(
+    this: StaticModel<T>,
+    id: string,
+  ): Promise<Record<string, any> | null> {
+    const data = await this._storage.getItemRaw<string>(this.getStorageKey(id));
 
     return data === null ? null : this.deserialize<T>(data);
   }
@@ -193,10 +167,8 @@ export class Model {
    *
    * @returns A `Query` instance bound to the Model class it was called from.
    */
-  public static query<T extends typeof Model>(
-    this: ThisConstructor<T>,
-  ): Query<This<T>, T> {
-    return Query.for<T>(this);
+  public static query<T extends Model>(this: StaticModel<T>): Query<T> {
+    return Query.for(this);
   }
 
   /**
@@ -219,40 +191,37 @@ export class Model {
    * @param id The ID of the Model instance to find.
    * @returns The Model instance if found, otherwise `null`.
    */
-  public static async findById<T extends ThisConstructor<typeof Model>>(
-    this: T,
+  public static async findById<T extends Model>(
+    this: StaticModel<T>,
     id: string,
-  ): Promise<This<T> | null> {
+  ): Promise<T | null> {
     const data = await this.readEntityFromStorage(id);
 
-    return data === null
-      ? null
-      : this.create<T>(data as Omit<This<T>, keyof Model>);
+    return data === null ? null : this.create<T>(data as OmitModel<T>);
   }
 
   /**
    * Find a Model instance.
    *
-   * @param query The query to match against.
    * @returns The first Model instance found, otherwise `null`.
    */
-  public static async first<T extends ThisConstructor<typeof Model>>(
-    this: T,
-  ): Promise<This<T> | null>;
+  public static async first<T extends Model>(
+    this: StaticModel<T>,
+  ): Promise<T | null>;
   /**
    * Find the first Model instance that matches the provided query.
    *
    * @param query The query to match against.
    * @returns The first Model instance that matches the query, otherwise `null`.
    */
-  public static async first<T extends ThisConstructor<typeof Model>>(
-    this: T,
-    query: Query<This<T>, T>,
-  ): Promise<This<T> | null>;
-  public static async first<T extends ThisConstructor<typeof Model>>(
-    this: T,
-    query?: Query<This<T>, T>,
-  ): Promise<This<T> | null> {
+  public static async first<T extends Model>(
+    this: StaticModel<T>,
+    query: Query<T>,
+  ): Promise<T | null>;
+  public static async first<T extends Model>(
+    this: StaticModel<T>,
+    query?: Query<T>,
+  ): Promise<T | null> {
     const { filter = undefined } = query?.build() ?? {};
 
     for (const id of await this.list()) {
@@ -263,7 +232,7 @@ export class Model {
       }
 
       if (query === undefined || filter === undefined) {
-        return this.create(entity as Omit<This<T>, keyof Model>);
+        return this.create(entity as OmitModel<T>);
       }
 
       for (const condition of filter) {
@@ -274,7 +243,7 @@ export class Model {
             condition.value,
           )
         ) {
-          return this.create(entity as Omit<This<T>, keyof Model>);
+          return this.create(entity as OmitModel<T>);
         }
       }
     }
@@ -287,27 +256,25 @@ export class Model {
    *
    * @returns An array of all Model instances
    */
-  public static async find<T extends ThisConstructor<typeof Model>>(
-    this: T,
-  ): Promise<This<T>[]>;
+  public static async find<T extends Model>(this: StaticModel<T>): Promise<T[]>;
   /**
    * Find all Model instances that match the provided query.
    *
    * @param query The query to search against.
    * @returns An array of Model instances that match the query.
    */
-  public static async find<T extends ThisConstructor<typeof Model>>(
-    this: T,
-    query: Query<This<T>, T>,
-  ): Promise<This<T>[]>;
-  public static async find<T extends ThisConstructor<typeof Model>>(
-    this: T,
-    query?: Query<This<T>, T>,
-  ): Promise<This<T>[]> {
-    let _query: Query<This<T>, T>;
+  public static async find<T extends Model>(
+    this: StaticModel<T>,
+    query: Query<T>,
+  ): Promise<T[]>;
+  public static async find<T extends Model>(
+    this: StaticModel<T>,
+    query?: Query<T>,
+  ): Promise<T[]> {
+    let _query: Query<T>;
 
     if (query === undefined) {
-      _query = this.query<T>();
+      _query = this.query();
     } else {
       _query = query;
     }
@@ -330,7 +297,7 @@ export class Model {
 
     return entities
       .filter((entity) => entity !== null)
-      .map((entity) => this.create<T>(entity as Omit<This<T>, keyof Model>));
+      .map((entity) => this.create<T>(entity as OmitModel<T>));
   }
 
   /**
@@ -357,7 +324,7 @@ export class Model {
    * @returns The Model instance overwritten with the provided data.
    * @throws `Error` if the data is invalid.
    */
-  public fill(data: Partial<Omit<this, keyof Model>>): this {
+  public fill(data: Partial<OmitModel<this>>): this {
     const requiredAttributes = ModelAttribute.getRequired(
       this.constructor as typeof Model,
     );
@@ -399,14 +366,12 @@ export class Model {
    *
    * @returns `true` if the Model instance was saved successfully.
    */
-  public async save(): Promise<true> {
+  public async save(): Promise<this> {
     this.id = await (
       this.constructor as typeof Model
     ).writeEntityToStorage<Model>(this);
 
-    this._dirty.clear();
-
-    return true;
+    return this;
   }
 
   // #endregion
@@ -419,7 +384,7 @@ export class Model {
    *
    * @returns A plain object representation of the Model instance.
    */
-  public toObject(): Object {
+  public toObject(): object {
     return Object.fromEntries(
       ModelAttribute.getFields(this.constructor as typeof Model)?.map(
         (attribute) => [attribute.name, this[attribute.name as keyof this]],
@@ -452,8 +417,8 @@ export class Model {
    * @param data The string to deserialize.
    * @returns An object created from the provided data.
    */
-  public static deserialize<T extends ThisConstructor<typeof Model>>(
-    this: T,
+  public static deserialize<T extends Model>(
+    this: StaticModel<T>,
     data: Buffer | string,
   ): Record<string, any> {
     return this._config.serialization.deserialize(data.toString());

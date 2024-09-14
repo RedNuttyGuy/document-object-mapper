@@ -1,6 +1,6 @@
-import { Model } from '../model/model.class';
+import type { Model } from '../model/model.class';
 import type { Typeof } from '../types/typeof.type';
-import { AttributeOptions } from './attribute-options.interface';
+import type { AttributeOptions } from './attribute-options.interface';
 import { attributesMetadataKey } from './attribute.decorator';
 
 /**
@@ -32,9 +32,11 @@ export class ModelAttribute {
     model: T,
     property: string,
     attribute: ModelAttribute,
-  ) {
+  ): void {
     let attributes: Map<string, ModelAttribute> =
-      Reflect.getMetadata(attributesMetadataKey, model) ?? new Map();
+      (Reflect.getMetadata(attributesMetadataKey, model) as
+        | Map<string, ModelAttribute>
+        | undefined) ?? new Map<string, ModelAttribute>();
 
     const isInitialized = this.initializedModels.has(model);
 

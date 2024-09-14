@@ -2,30 +2,41 @@ import { QueryOperator } from './query-operator.enum';
 import type { QueryFilter } from './query-filter.type';
 import type { CompiledQuery } from './compiled-query.interface';
 import type { Model } from '../model/model.class';
-import { This } from '../types/this.type';
+import type { StaticModel } from '../types/static-model.type';
+import type { OmitModel } from 'src/types/omit-model';
 
-export class Query<T extends Model, TModel extends typeof Model> {
-  protected _model: TModel;
-
-  public static for<T extends typeof Model>(model: T): Query<This<T>, T> {
-    return new Query<This<T>, T>().for(model);
+/**
+ * Query builder used to filter and retrieve data from a model.
+ */
+export class Query<T extends Model> {
+  public constructor(model: StaticModel<T>) {
+    this.for(model);
   }
 
-  private for(model: TModel): this {
+  protected _model: StaticModel<T>;
+
+  public static for<T extends Model>(model: StaticModel<T>): Query<T> {
+    return new Query<T>(model);
+  }
+
+  private for(model: StaticModel<T>): this {
     this._model = model;
 
     return this;
   }
 
-  private filters: QueryFilter<T>[] = [];
+  private filters: QueryFilter<OmitModel<T>>[] = [];
 
-  public where<TField extends keyof T>(field: TField, value: T[TField]): this;
-  public where<TField extends keyof T>(
+  public where<TField extends keyof OmitModel<T>>(
+    field: TField,
+    value: T[TField],
+  ): this;
+  public where<TField extends keyof OmitModel<T>>(
     field: TField,
     operator: QueryOperator | `${QueryOperator}`,
     value: T[TField],
   ): this;
-  public where<TField extends keyof T>(
+  public where<TField extends keyof OmitModel<T>>(
     field: TField,
     operator: QueryOperator | `${QueryOperator}` | T[TField],
     value?: T[TField],
@@ -44,20 +55,16 @@ export class Query<T extends Model, TModel extends typeof Model> {
     return this;
   }
 
-  public async find(
-    this: Query<This<TModel>, TModel>,
-  ): Promise<This<TModel>[]> {
-    return this._model.find<TModel>(this);
+  public async find(this: Query<T>): Promise<T[]> {
+    return this._model.find(this);
   }
 
-  public async first(
-    this: Query<This<TModel>, TModel>,
-  ): Promise<This<TModel> | null> {
-    return this._model.first<TModel>(this);
+  public async first(this: Query<T>): Promise<T | null> {
+    return this._model.first(this);
   }
 
-  public clone(): Query<T, TModel> {
-    const copy = new Query<T, TModel>().for(this._model);
+  public clone(): Query<T> {
+    const copy = new Query<T>(this._model);
 
     for (const { field, operator, value } of this.filters) {
       copy.where(field, operator, value);

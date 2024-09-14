@@ -4,6 +4,13 @@ import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 export default tseslint.config(
   ...tseslint.configs.recommendedTypeChecked,
   eslintPluginPrettierRecommended,
+  { 
+    ignores: [
+      'jest.config.ts',
+      'dist/**/*', 
+      'docs/**/*',
+    ],
+  },
   {
     languageOptions: {
       parserOptions: {
@@ -17,13 +24,20 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/ban-types': [
+        "error",
+        {
+            "types": { "Function": false },
+            "extendDefaults": true
+        }
+      ]
     },
   },
   {
     files: ['*.test.ts', '**/*.test.ts'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
-    }
-  }
+    },
+  },
 );
   

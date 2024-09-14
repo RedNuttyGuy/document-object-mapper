@@ -22,11 +22,11 @@
     "include": [
         "index.ts",
         "src/**/*",
+        "testing/**/*",
     ],
     "exclude": [
-        "src/**/*.test.ts",
+        "docs",
         "dist",
         "node_modules",
-        "testing"
     ]
 }
